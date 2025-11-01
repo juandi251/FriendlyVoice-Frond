@@ -59,13 +59,13 @@ export function VoiceMessageInput({ onSendMessage }: VoiceMessageInputProps) {
       
       <div className="flex items-center space-x-3">
         {status === 'idle' || status === 'stopped' || status === 'error' ? (
-          <Button onClick={startRecording} disabled={isSubmitting} variant="outline" size="icon" aria-label="Grabar voz">
+          <Button onClick={() => startRecording()} disabled={isSubmitting} variant="outline" size="icon" aria-label="Grabar voz">
             <Mic className="h-5 w-5" />
           </Button>
         ) : null}
 
         {status === 'recording' ? (
-          <Button onClick={stopRecording} disabled={isSubmitting} variant="destructive" size="icon" aria-label="Detener grabación">
+          <Button onClick={() => stopRecording()} disabled={isSubmitting} variant="destructive" size="icon" aria-label="Detener grabación">
             <StopCircle className="h-5 w-5" />
           </Button>
         ) : null}

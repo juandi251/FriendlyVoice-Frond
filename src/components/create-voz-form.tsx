@@ -128,7 +128,7 @@ export function CreateVozForm({ onVozCreated }: CreateVozFormProps) {
               </Button>
             ) : null}
             {status === 'recording' ? (
-              <Button onClick={stopRecording} disabled={isSubmitting} variant="destructive">
+              <Button onClick={() => stopRecording()} disabled={isSubmitting} variant="destructive">
                 <StopCircle className="mr-2" /> Detener Grabación
               </Button>
             ) : null}
