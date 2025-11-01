@@ -16,7 +16,7 @@ import { initialMockVoces as allMockVoces } from '@/lib/mock-data'; // Import al
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 
 export default function FeedPage() {
   const { user, loading: authLoading, getUserById } = useAuth();
@@ -28,6 +28,14 @@ export default function FeedPage() {
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [selectedVozForReport, setSelectedVozForReport] = useState<string | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Helper function to get date from Voz object that may have Firestore Timestamp
+  const getVozDate = (voz: Voz & { createdAtTimestamp?: Timestamp }): Date => {
+    if (voz.createdAtTimestamp && typeof voz.createdAtTimestamp.toDate === 'function') {
+      return voz.createdAtTimestamp.toDate();
+    }
+    return new Date(voz.createdAt || 0);
+  };
 
   // Helper to load hidden IDs from localStorage
   const loadHiddenIds = (): Set<string> => {
@@ -55,20 +63,20 @@ export default function FeedPage() {
       unsubscribe = onSnapshot(
         collection(db, 'voces'),
         (snapshot) => {
-          const firestoreVoces: Voz[] = snapshot.docs.map(doc => ({
+          const firestoreVoces: (Voz & { createdAtTimestamp?: Timestamp })[] = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
-          } as Voz));
+          } as Voz & { createdAtTimestamp?: Timestamp }));
           
           // Ordenar por fecha en cliente (más robusto que depender de índices)
           firestoreVoces.sort((a, b) => {
-            const aTime = a.createdAtTimestamp?.toDate?.() || new Date(a.createdAt || 0);
-            const bTime = b.createdAtTimestamp?.toDate?.() || new Date(b.createdAt || 0);
+            const aTime = getVozDate(a);
+            const bTime = getVozDate(b);
             return bTime.getTime() - aTime.getTime();
           });
           
           // Combinar voces de Firestore con mock data
-          const combinedVoces = [...firestoreVoces, ...feedVoces];
+          const combinedVoces: (Voz & { createdAtTimestamp?: Timestamp })[] = [...firestoreVoces, ...feedVoces.map(v => ({ ...v } as Voz & { createdAtTimestamp?: Timestamp }))];
           
           // Eliminar duplicados por ID
           const uniqueVoces = Array.from(
@@ -86,22 +94,26 @@ export default function FeedPage() {
               const bIsFollowed = user.following!.includes(b.userId);
               if (aIsFollowed && !bIsFollowed) return -1;
               if (!aIsFollowed && bIsFollowed) return 1;
-              const aTime = a.createdAtTimestamp?.toDate?.() || new Date(a.createdAt || 0);
-              const bTime = b.createdAtTimestamp?.toDate?.() || new Date(b.createdAt || 0);
+              const aTime = getVozDate(a as Voz & { createdAtTimestamp?: Timestamp });
+              const bTime = getVozDate(b as Voz & { createdAtTimestamp?: Timestamp });
               return bTime.getTime() - aTime.getTime();
             });
           } else {
             // Default sort by date
             processedVoces.sort((a, b) => {
-              const aTime = a.createdAtTimestamp?.toDate?.() || new Date(a.createdAt || 0);
-              const bTime = b.createdAtTimestamp?.toDate?.() || new Date(b.createdAt || 0);
+              const aTime = getVozDate(a as Voz & { createdAtTimestamp?: Timestamp });
+              const bTime = getVozDate(b as Voz & { createdAtTimestamp?: Timestamp });
               return bTime.getTime() - aTime.getTime();
             });
           }
           
           // If not admin, filter out hidden voices
           const isAdmin = user?.role === 'admin';
-          const visibleVoces = isAdmin ? processedVoces : processedVoces.filter(v => !v.hidden);
+          const visibleVoces: Voz[] = (isAdmin ? processedVoces : processedVoces.filter(v => !v.hidden)).map(v => {
+            // Remove createdAtTimestamp if it exists to match Voz type
+            const { createdAtTimestamp, ...vozWithoutTimestamp } = v;
+            return vozWithoutTimestamp as Voz;
+          });
 
           setVoces(visibleVoces);
           setIsLoadingFeed(false);
